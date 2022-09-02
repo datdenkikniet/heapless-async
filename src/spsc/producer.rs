@@ -5,15 +5,15 @@ use core::{
 
 use heapless::spsc::Producer as HProducer;
 
-use crate::{lock::Lock, log::*};
+use crate::{lock::Lock, log::*, waker::WakerRegistration};
 
 pub struct Producer<'queue, T, const N: usize>
 where
     T: Unpin,
 {
     inner: HProducer<'queue, T, N>,
-    producer_waker: &'queue Lock<Option<Waker>>,
-    consumer_waker: &'queue Lock<Option<Waker>>,
+    producer_waker: &'queue Lock<WakerRegistration>,
+    consumer_waker: &'queue Lock<WakerRegistration>,
 }
 
 impl<'queue, T, const N: usize> Producer<'queue, T, N>
@@ -22,8 +22,8 @@ where
 {
     pub fn new(
         producer: HProducer<'queue, T, N>,
-        producer_waker: &'queue Lock<Option<Waker>>,
-        consumer_waker: &'queue Lock<Option<Waker>>,
+        producer_waker: &'queue Lock<WakerRegistration>,
+        consumer_waker: &'queue Lock<WakerRegistration>,
     ) -> Self {
         Self {
             inner: producer,
@@ -59,7 +59,7 @@ where
             .consumer_waker
             .try_lock(|wk| {
                 debug!("Waking consumer");
-                wk.take().map(|wk| wk.wake_by_ref());
+                wk.wake();
             })
             .is_some()
         {
@@ -75,7 +75,7 @@ where
             .producer
             .producer_waker
             .try_lock(|wk| {
-                *wk = Some(waker.clone());
+                wk.register(waker);
                 debug!("Registered producer waker")
             })
             .is_some()

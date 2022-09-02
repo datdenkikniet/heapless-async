@@ -1,5 +1,3 @@
-use core::task::Waker;
-
 use heapless::spsc::Queue as HQueue;
 
 mod producer;
@@ -8,15 +6,15 @@ pub use producer::Producer;
 mod consumer;
 pub use consumer::Consumer;
 
-use crate::lock::Lock;
+use crate::{lock::Lock, waker::WakerRegistration};
 
 pub struct Queue<T, const N: usize>
 where
     T: Unpin,
 {
     inner: HQueue<T, N>,
-    producer_waker: Lock<Option<Waker>>,
-    consumer_waker: Lock<Option<Waker>>,
+    producer_waker: Lock<WakerRegistration>,
+    consumer_waker: Lock<WakerRegistration>,
 }
 
 impl<T, const N: usize> Queue<T, N>
@@ -26,8 +24,8 @@ where
     pub fn new() -> Self {
         Self {
             inner: HQueue::new(),
-            producer_waker: Lock::new(None),
-            consumer_waker: Lock::new(None),
+            producer_waker: Lock::new(WakerRegistration::new()),
+            consumer_waker: Lock::new(WakerRegistration::new()),
         }
     }
 

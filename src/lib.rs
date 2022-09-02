@@ -1,6 +1,7 @@
 #![no_std]
 
 mod lock;
+mod waker;
 
 #[cfg(not(feature = "log-selected"))]
 compile_error!("Exactly one of the `log` or `defmt` features must be enabled");
