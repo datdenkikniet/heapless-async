@@ -49,16 +49,14 @@ where
 mod test {
     extern crate std;
     use std::boxed::Box;
+    use std::println;
     use std::time::Duration;
     use std::vec::Vec;
 
     use super::Queue;
-    use crate::log::info;
 
     #[tokio::test]
     async fn spsc() {
-        pretty_env_logger::formatted_builder().is_test(true).init();
-
         let queue: &'static mut Queue<u32, 8> = Box::leak(Box::new(Queue::new()));
 
         let (mut tx, mut rx) = queue.split();
@@ -70,11 +68,11 @@ mod test {
 
         let t1_data = data.clone();
         let t1 = tokio::task::spawn(async move {
-            info!("Dequeueing...");
+            println!("Dequeueing...");
             let mut rx_data = Vec::new();
             loop {
                 let value = rx.dequeue().await;
-                info!("Succesfully dequeued {}", value);
+                println!("Succesfully dequeued {}", value);
                 rx_data.push(value);
                 if value == MAX {
                     break;
@@ -85,12 +83,12 @@ mod test {
 
         let t2 = tokio::task::spawn(async move {
             let mut interval = tokio::time::interval(Duration::from_millis(1));
-            info!("Enqueing...");
+            println!("Enqueing...");
             for i in data {
                 tx.enqueue(i).await;
                 interval.tick().await;
             }
-            info!("Succesfully enqueued");
+            println!("Succesfully enqueued");
         });
 
         let (t1, t2) = tokio::join!(t1, t2);
