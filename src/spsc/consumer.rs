@@ -7,6 +7,12 @@ use heapless::spsc::Consumer as HConsumer;
 
 use crate::{lock::Lock, log::*, waker::WakerRegistration};
 
+/// This error may be returned by [`Consumer::try_dequeue`].
+pub enum ConsumerError {
+    WouldBlock,
+    Empty,
+}
+
 /// An async consumer
 pub struct Consumer<'queue, T, const N: usize>
 where
@@ -63,16 +69,18 @@ where
 
     /// Attempt to dequeue an item from the backing queue.
     ///
-    /// This function may block for a while as result of contention of
-    /// a lock between the [`Producer`](super::Producer) and [`Consumer`].
-    pub fn try_dequeue(&mut self) -> Option<T> {
-        let value = self.inner.dequeue();
-
-        if value.is_some() {
-            while !self.try_wake_producer() {}
+    /// If [`ConsumerError::WouldBlock`] is returned, the [`Producer`](super::Producer)
+    /// has a lock on it's waker which prevents this consumer from properly waking it.
+    pub fn try_dequeue(&mut self) -> Result<T, ConsumerError> {
+        if !self.try_wake_producer() {
+            return Err(ConsumerError::WouldBlock);
         }
 
-        value
+        if let Some(val) = self.inner.dequeue() {
+            Ok(val)
+        } else {
+            Err(ConsumerError::Empty)
+        }
     }
 
     /// Try to wake the [`Producer`](super::Producer) associated with the backing queue.

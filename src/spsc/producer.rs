@@ -7,6 +7,22 @@ use heapless::spsc::Producer as HProducer;
 
 use crate::{lock::Lock, log::*, waker::WakerRegistration};
 
+/// The error value that can be returned by
+/// the fallible [`Producer::try_enqueue`] method.
+pub enum ProducerError<T> {
+    WouldBlock(T),
+    Full(T),
+}
+
+impl<T> ProducerError<T> {
+    pub fn get_value(self) -> T {
+        match self {
+            ProducerError::WouldBlock(v) => v,
+            ProducerError::Full(v) => v,
+        }
+    }
+}
+
 /// An async producer
 pub struct Producer<'queue, T, const N: usize>
 where
@@ -65,16 +81,14 @@ where
 
     /// Try to enqueue `value` into the backing queue.
     ///
-    /// This function may block for a while as result of contention of
-    /// a lock between the [`Producer`] and [`Consumer`](super::Consumer).
-    pub fn try_enqueue(&mut self, value: T) -> Result<(), T> {
-        let result = self.inner.enqueue(value);
-
-        if result.is_ok() {
-            while !self.try_wake_consumer() {}
+    /// If [`ProducerError::WouldBlock`] is returned, the [`Consumer`](super::Consumer)
+    /// has a lock on it's waker which prevents this producer from properly waking it.
+    pub fn try_enqueue(&mut self, value: T) -> Result<(), ProducerError<T>> {
+        if !self.try_wake_consumer() {
+            return Err(ProducerError::WouldBlock(value));
         }
 
-        result
+        self.inner.enqueue(value).map_err(ProducerError::Full)
     }
 
     /// Try to wake the [`Consumer`](super::Consumer) associated with the backing queue.
