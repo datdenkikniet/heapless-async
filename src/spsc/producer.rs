@@ -33,6 +33,24 @@ where
         }
     }
 
+    /// Check if an item can be enqueued.
+    ///
+    /// If this returns true, at least the first subsequent [`Self::enqueue`] will succeed
+    /// immediately
+    pub fn ready(&self) -> bool {
+        self.inner.ready()
+    }
+
+    /// Returns the maximum number of elements the queue can hold
+    pub fn capacity(&self) -> usize {
+        self.inner.capacity()
+    }
+
+    /// Returns the amount of elements currently in the queue
+    pub fn len(&self) -> usize {
+        self.inner.len()
+    }
+
     /// Enqueue `value` into the backing queue.
     ///
     /// The returned Future only resolves once the value was
@@ -44,23 +62,23 @@ where
             value_to_enqueue: value,
         }
     }
-}
 
-pub struct ProducerFuture<'producer, 'queue, T, const N: usize>
-where
-    T: Unpin,
-{
-    producer: &'producer mut Producer<'queue, T, N>,
-    value_to_enqueue: Option<T>,
-}
+    /// Try to enqueue `value` into the backing queue
+    ///
+    /// This function may block for a while as result of contention of
+    /// a lock between the [Producer] and [Consumer].
+    pub fn try_enqueue(&mut self, value: T) -> Result<(), T> {
+        let result = self.inner.enqueue(value);
 
-impl<T, const N: usize> ProducerFuture<'_, '_, T, N>
-where
-    T: Unpin,
-{
+        if result.is_ok() {
+            while !self.try_wake_consumer() {}
+        }
+
+        result
+    }
+
     fn try_wake_consumer(&mut self) -> bool {
         if self
-            .producer
             .consumer_waker
             .try_lock(|wk| {
                 trace!("Waking consumer");
@@ -77,7 +95,6 @@ where
 
     fn register_waker(&mut self, waker: &Waker) -> bool {
         if self
-            .producer
             .producer_waker
             .try_lock(|wk| {
                 wk.register(waker);
@@ -93,6 +110,14 @@ where
     }
 }
 
+pub struct ProducerFuture<'producer, 'queue, T, const N: usize>
+where
+    T: Unpin,
+{
+    producer: &'producer mut Producer<'queue, T, N>,
+    value_to_enqueue: Option<T>,
+}
+
 impl<T, const N: usize> Future for ProducerFuture<'_, '_, T, N>
 where
     T: Unpin,
@@ -105,7 +130,7 @@ where
     ) -> Poll<Self::Output> {
         trace!("Poll producer");
         let try_wake_consumer = |me: &mut Self| {
-            if me.try_wake_consumer() {
+            if me.producer.try_wake_consumer() {
                 return Poll::Ready(());
             } else {
                 cx.waker().wake_by_ref();
@@ -133,7 +158,7 @@ where
 
         me.value_to_enqueue = Some(failed_enqueue_value);
 
-        if !me.register_waker(cx.waker()) {
+        if !me.producer.register_waker(cx.waker()) {
             cx.waker().wake_by_ref();
         }
         Poll::Pending

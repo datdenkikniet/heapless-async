@@ -33,6 +33,23 @@ where
         }
     }
 
+    /// Check if there are any items to dequeue.
+    ///
+    /// When this returns true, at least the first subsequent [`Self::dequeue`] will succeed immediately
+    pub fn ready(&self) -> bool {
+        self.inner.ready()
+    }
+
+    /// Returns the maximum number of elements the queue can hold
+    pub fn capacity(&self) -> usize {
+        self.inner.capacity()
+    }
+
+    /// Returns the amount of elements currently in the queue
+    pub fn len(&self) -> usize {
+        self.inner.len()
+    }
+
     /// Dequeue an item from the backing queue.
     ///
     /// The returned future only resolves once an item was succesfully
@@ -43,23 +60,23 @@ where
             dequeued_value: None,
         }
     }
-}
 
-pub struct ConsumerFuture<'consumer, 'queue, T, const N: usize>
-where
-    T: Unpin,
-{
-    consumer: &'consumer mut Consumer<'queue, T, N>,
-    dequeued_value: Option<T>,
-}
+    /// Attempt to dequeue an item from the backing queue.
+    ///
+    /// This function may block for a while as result of contention of
+    /// a lock between the Producer/Consumer.
+    pub fn try_dequeue(&mut self) -> Option<T> {
+        let value = self.inner.dequeue();
 
-impl<T, const N: usize> ConsumerFuture<'_, '_, T, N>
-where
-    T: Unpin,
-{
+        if value.is_some() {
+            while !self.try_wake_producer() {}
+        }
+
+        value
+    }
+
     fn try_wake_producer(&mut self) -> bool {
         if self
-            .consumer
             .producer_waker
             .try_lock(|wk| {
                 trace!("Waking producer");
@@ -76,7 +93,6 @@ where
 
     fn try_register_waker(&mut self, waker: &Waker) -> bool {
         if self
-            .consumer
             .consumer_waker
             .try_lock(|wk| {
                 wk.register(waker);
@@ -92,6 +108,14 @@ where
     }
 }
 
+pub struct ConsumerFuture<'consumer, 'queue, T, const N: usize>
+where
+    T: Unpin,
+{
+    consumer: &'consumer mut Consumer<'queue, T, N>,
+    dequeued_value: Option<T>,
+}
+
 impl<T, const N: usize> Future for ConsumerFuture<'_, '_, T, N>
 where
     T: Unpin,
@@ -103,7 +127,7 @@ where
         cx: &mut core::task::Context<'_>,
     ) -> Poll<Self::Output> {
         let try_wake_producer = |me: &mut Self, value| {
-            if me.try_wake_producer() {
+            if me.consumer.try_wake_producer() {
                 return Poll::Ready(value);
             } else {
                 me.dequeued_value = Some(value);
@@ -128,7 +152,7 @@ where
             // dequeue a value
             try_wake_producer(me, value)
         } else {
-            if !me.try_register_waker(cx.waker()) {
+            if !me.consumer.try_register_waker(cx.waker()) {
                 cx.waker().wake_by_ref()
             }
             Poll::Pending

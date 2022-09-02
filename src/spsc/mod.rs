@@ -1,4 +1,4 @@
-//! An async wrapper around `heapless::spsc::Queue`
+//! An async wrapper around [`heapless::spsc::Queue`]
 
 use heapless::spsc::Queue as HQueue;
 
@@ -10,7 +10,7 @@ pub use consumer::Consumer;
 
 use crate::{lock::Lock, waker::WakerRegistration};
 
-/// An async queue backed by a heapless [heapless::spsc::Queue]
+/// An async queue
 pub struct Queue<T, const N: usize>
 where
     T: Unpin,
