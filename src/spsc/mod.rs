@@ -25,7 +25,7 @@ where
     T: Unpin,
 {
     /// Create a new Queue
-    pub fn new() -> Self {
+    pub const fn new() -> Self {
         Self {
             inner: HQueue::new(),
             producer_waker: Lock::new(WakerRegistration::new()),

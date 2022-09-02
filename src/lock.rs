@@ -12,7 +12,7 @@ unsafe impl<T> Send for Lock<T> {}
 unsafe impl<T> Sync for Lock<T> {}
 
 impl<T> Lock<T> {
-    pub fn new(value: T) -> Self {
+    pub const fn new(value: T) -> Self {
         Self {
             locked: AtomicBool::new(false),
             value: UnsafeCell::new(value),
