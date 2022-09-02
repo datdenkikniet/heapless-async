@@ -7,6 +7,7 @@ use heapless::spsc::Producer as HProducer;
 
 use crate::{lock::Lock, log::*, waker::WakerRegistration};
 
+/// An async producer
 pub struct Producer<'queue, T, const N: usize>
 where
     T: Unpin,
@@ -20,7 +21,7 @@ impl<'queue, T, const N: usize> Producer<'queue, T, N>
 where
     T: Unpin,
 {
-    pub fn new(
+    pub(crate) fn new(
         producer: HProducer<'queue, T, N>,
         producer_waker: &'queue Lock<WakerRegistration>,
         consumer_waker: &'queue Lock<WakerRegistration>,
@@ -32,6 +33,10 @@ where
         }
     }
 
+    /// Enqueue `value` into the backing queue.
+    ///
+    /// The returned Future only resolves once the value was
+    /// succesfully enqueued.
     pub fn enqueue<'me>(&'me mut self, value: T) -> ProducerFuture<'me, 'queue, T, N> {
         let value = self.inner.enqueue(value).err();
         ProducerFuture {

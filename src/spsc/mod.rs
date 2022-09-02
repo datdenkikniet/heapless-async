@@ -1,3 +1,5 @@
+//! An async wrapper around `heapless::spsc::Queue`
+
 use heapless::spsc::Queue as HQueue;
 
 mod producer;
@@ -8,6 +10,7 @@ pub use consumer::Consumer;
 
 use crate::{lock::Lock, waker::WakerRegistration};
 
+/// An async queue backed by a heapless [heapless::spsc::Queue]
 pub struct Queue<T, const N: usize>
 where
     T: Unpin,
@@ -21,6 +24,7 @@ impl<T, const N: usize> Queue<T, N>
 where
     T: Unpin,
 {
+    /// Create a new Queue
     pub fn new() -> Self {
         Self {
             inner: HQueue::new(),
@@ -29,6 +33,7 @@ where
         }
     }
 
+    /// Split the queue into a producer and consumer
     pub fn split(&mut self) -> (Producer<'_, T, N>, Consumer<'_, T, N>) {
         let (cw, pw) = (&self.consumer_waker, &self.producer_waker);
 

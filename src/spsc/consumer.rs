@@ -7,6 +7,7 @@ use heapless::spsc::Consumer as HConsumer;
 
 use crate::{lock::Lock, log::*, waker::WakerRegistration};
 
+/// An async consumer
 pub struct Consumer<'queue, T, const N: usize>
 where
     T: Unpin,
@@ -20,7 +21,7 @@ impl<'queue, T, const N: usize> Consumer<'queue, T, N>
 where
     T: Unpin,
 {
-    pub fn new(
+    pub(crate) fn new(
         consumer: HConsumer<'queue, T, N>,
         producer_waker: &'queue Lock<WakerRegistration>,
         consumer_waker: &'queue Lock<WakerRegistration>,
@@ -32,6 +33,10 @@ where
         }
     }
 
+    /// Dequeue an item from the backing queue.
+    ///
+    /// The returned future only resolves once an item was succesfully
+    /// dequeued.
     pub fn dequeue<'me>(&'me mut self) -> ConsumerFuture<'me, 'queue, T, N> {
         ConsumerFuture {
             consumer: self,

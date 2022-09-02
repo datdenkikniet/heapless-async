@@ -11,6 +11,7 @@ mod log {
 }
 
 #[cfg(not(any(feature = "log-defmt", feature = "log-log")))]
+#[allow(missing_docs)]
 mod log {
 
     #[macro_export]
