@@ -7,4 +7,5 @@ mod waker;
 
 pub(crate) mod log;
 
+pub mod mpmc;
 pub mod spsc;

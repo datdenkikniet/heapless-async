@@ -23,6 +23,8 @@ pub struct WakerRegistration {
 }
 
 impl WakerRegistration {
+    pub const EMPTY: Self = Self::new();
+
     pub const fn new() -> Self {
         Self { waker: None }
     }
@@ -45,5 +47,10 @@ impl WakerRegistration {
     /// Wake the registered waker, if any.
     pub fn wake(&mut self) {
         self.waker.take().map(|w| w.wake());
+    }
+
+    /// Check if this WakerRegistration is empty
+    pub fn is_empty(&self) -> bool {
+        self.waker.is_none()
     }
 }
