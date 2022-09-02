@@ -3,6 +3,8 @@
 mod dequeue;
 mod enqueue;
 
+use core::task::Waker;
+
 use heapless::mpmc::MpMcQueue as HMpMcQueue;
 
 use crate::{lock::Lock, waker::WakerRegistration};
@@ -52,6 +54,42 @@ where
     /// TODO
     pub fn dequeue<'me>(&'me self) -> DequeueFuture<'me, T, W, N> {
         DequeueFuture::new(self)
+    }
+
+    pub(crate) fn try_wake_enqueuers(&self) -> bool {
+        self.wakers
+            .enqueue_wakers
+            .try_lock(|wks| wks.iter_mut().for_each(|wk| wk.wake()))
+            .is_some()
+    }
+
+    pub(crate) fn register_dequeuer_waker(&self, waker: &Waker) -> bool {
+        let res = self.wakers.dequeue_wakers.try_lock(|wks| {
+            wks.iter_mut()
+                .find(|wk| wk.is_empty())
+                .map(|wk| wk.register(waker))
+                .is_some()
+        });
+
+        res == Some(true)
+    }
+
+    pub(crate) fn try_wake_dequeuers(&self) -> bool {
+        self.wakers
+            .dequeue_wakers
+            .try_lock(|wks| wks.iter_mut().for_each(|wk| wk.wake()))
+            .is_some()
+    }
+
+    pub(crate) fn register_enqueuer_waker(&self, waker: &Waker) -> bool {
+        let res = self.wakers.enqueue_wakers.try_lock(|wks| {
+            wks.iter_mut()
+                .find(|wk| wk.is_empty())
+                .map(|wk| wk.register(waker))
+                .is_some()
+        });
+
+        res == Some(true)
     }
 }
 

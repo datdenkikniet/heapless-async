@@ -1,7 +1,4 @@
-use core::{
-    future::Future,
-    task::{Poll, Waker},
-};
+use core::{future::Future, task::Poll};
 
 use super::MpMcQueue;
 
@@ -23,25 +20,6 @@ where
             value_to_enqueue: Some(value),
         }
     }
-
-    fn try_wake_dequeuers(&self) -> bool {
-        self.inner
-            .wakers
-            .dequeue_wakers
-            .try_lock(|wks| wks.iter_mut().for_each(|wk| wk.wake()))
-            .is_some()
-    }
-
-    fn register_waker(&mut self, waker: &Waker) -> bool {
-        let res = self.inner.wakers.enqueue_wakers.try_lock(|wks| {
-            wks.iter_mut()
-                .find(|wk| wk.is_empty())
-                .map(|wk| wk.register(waker))
-                .is_some()
-        });
-
-        res == Some(true)
-    }
 }
 
 impl<T, const W: usize, const N: usize> Future for EnqueueFuture<'_, T, W, N>
@@ -55,7 +33,7 @@ where
         cx: &mut core::task::Context<'_>,
     ) -> Poll<Self::Output> {
         let try_wake_dequeuers = |me: &mut Self| {
-            if me.try_wake_dequeuers() {
+            if me.inner.try_wake_dequeuers() {
                 Poll::Ready(())
             } else {
                 cx.waker().wake_by_ref();
@@ -78,7 +56,7 @@ where
         };
 
         me.value_to_enqueue = Some(failed_to_enqueue_value);
-        if !me.register_waker(cx.waker()) {
+        if !me.inner.register_enqueuer_waker(cx.waker()) {
             cx.waker().wake_by_ref();
         }
         Poll::Pending
