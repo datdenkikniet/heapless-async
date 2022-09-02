@@ -38,7 +38,7 @@ impl<T, const W: usize, const N: usize> MpMcQueue<T, W, N>
 where
     T: Unpin,
 {
-    /// Create a new MpMcQueue
+    /// Create a new [`MpMcQueue`]
     pub const fn new() -> Self {
         Self {
             inner: HMpMcQueue::new(),
@@ -46,16 +46,30 @@ where
         }
     }
 
-    /// TODO
+    /// Enqueue an item into the [`MpMcQueue`].
+    ///
+    /// The returned Future will resolve once the value is succesfully enqueued.
+    ///
+    /// If the value cannot be enqueued, and there are no unoccupied enqueuer waker
+    /// slots, the Future will request to be awoken immediately.
     pub fn enqueue<'me>(&'me self, value: T) -> EnqueueFuture<'me, T, W, N> {
         EnqueueFuture::new(self, value)
     }
 
-    /// TODO
+    /// Dequeue an item from the [`MpMcQueue`].
+    ///
+    /// The returned Future will resolve once the value is succesfully enqueued.
+    ///
+    /// If a value cannot be dequeued, and there are no unoccupied dequeuer waker
+    /// slots, the Future will request to be awoken immediately.    
     pub fn dequeue<'me>(&'me self) -> DequeueFuture<'me, T, W, N> {
         DequeueFuture::new(self)
     }
 
+    /// Try to wake the enqueuers.
+    ///
+    /// Currently implemented as unfairly as can be by just waking
+    /// everyone in order.
     pub(crate) fn try_wake_enqueuers(&self) -> bool {
         self.wakers
             .enqueue_wakers
@@ -63,6 +77,7 @@ where
             .is_some()
     }
 
+    /// Attempt to register `waker` as a dequeuer waker
     pub(crate) fn register_dequeuer_waker(&self, waker: &Waker) -> bool {
         let res = self.wakers.dequeue_wakers.try_lock(|wks| {
             wks.iter_mut()
@@ -74,6 +89,10 @@ where
         res == Some(true)
     }
 
+    /// Try to wake the dequeuers.
+    ///
+    /// Currently implemented as unfairly as can be by just waking
+    /// everyone in order.
     pub(crate) fn try_wake_dequeuers(&self) -> bool {
         self.wakers
             .dequeue_wakers
@@ -81,6 +100,7 @@ where
             .is_some()
     }
 
+    /// Attempt to register `waker` as an enqueuer waker
     pub(crate) fn register_enqueuer_waker(&self, waker: &Waker) -> bool {
         let res = self.wakers.enqueue_wakers.try_lock(|wks| {
             wks.iter_mut()
