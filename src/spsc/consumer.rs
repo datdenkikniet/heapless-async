@@ -64,7 +64,7 @@ where
     /// Attempt to dequeue an item from the backing queue.
     ///
     /// This function may block for a while as result of contention of
-    /// a lock between the Producer/Consumer.
+    /// a lock between the [`Producer`](super::Producer) and [`Consumer`].
     pub fn try_dequeue(&mut self) -> Option<T> {
         let value = self.inner.dequeue();
 
@@ -75,15 +75,12 @@ where
         value
     }
 
+    /// Try to wake the [`Producer`](super::Producer) associated with the backing queue.
+    ///
+    /// Returns true if the waker was waked succesfully.
     fn try_wake_producer(&mut self) -> bool {
-        if self
-            .producer_waker
-            .try_lock(|wk| {
-                trace!("Waking producer");
-                wk.wake()
-            })
-            .is_some()
-        {
+        if self.producer_waker.try_lock(|wk| wk.wake()).is_some() {
+            trace!("Waking producer");
             true
         } else {
             trace!("Failed to wake producer");
@@ -91,18 +88,16 @@ where
         }
     }
 
+    /// Try to register `waker` as the waker for this [`Consumer`]
+    ///
+    /// Returns true if the waker was registered succesfully.
     fn try_register_waker(&mut self, waker: &Waker) -> bool {
-        if self
-            .consumer_waker
-            .try_lock(|wk| {
-                wk.register(waker);
-                trace!("Registered consumer waker.");
-            })
-            .is_none()
-        {
+        let cons_waker = &mut self.consumer_waker;
+        if cons_waker.try_lock(|wk| wk.register(waker)).is_none() {
             trace!("Failed to register consumer waker.");
             false
         } else {
+            trace!("Registered consumer waker.");
             true
         }
     }

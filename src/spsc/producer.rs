@@ -36,17 +36,17 @@ where
     /// Check if an item can be enqueued.
     ///
     /// If this returns true, at least the first subsequent [`Self::enqueue`] will succeed
-    /// immediately
+    /// immediately.
     pub fn ready(&self) -> bool {
         self.inner.ready()
     }
 
-    /// Returns the maximum number of elements the queue can hold
+    /// Returns the maximum number of elements the queue can hold.
     pub fn capacity(&self) -> usize {
         self.inner.capacity()
     }
 
-    /// Returns the amount of elements currently in the queue
+    /// Returns the amount of elements currently in the queue.
     pub fn len(&self) -> usize {
         self.inner.len()
     }
@@ -63,10 +63,10 @@ where
         }
     }
 
-    /// Try to enqueue `value` into the backing queue
+    /// Try to enqueue `value` into the backing queue.
     ///
     /// This function may block for a while as result of contention of
-    /// a lock between the [Producer] and [Consumer].
+    /// a lock between the [`Producer`] and [`Consumer`](super::Consumer).
     pub fn try_enqueue(&mut self, value: T) -> Result<(), T> {
         let result = self.inner.enqueue(value);
 
@@ -77,15 +77,13 @@ where
         result
     }
 
+    /// Try to wake the [`Consumer`](super::Consumer) associated with the backing queue.
+    ///
+    /// Returns true if the waker was waked succesfully.
     fn try_wake_consumer(&mut self) -> bool {
-        if self
-            .consumer_waker
-            .try_lock(|wk| {
-                trace!("Waking consumer");
-                wk.wake();
-            })
-            .is_some()
-        {
+        let cons_waker = &mut self.consumer_waker;
+        if cons_waker.try_lock(|wk| wk.wake()).is_some() {
+            trace!("Waking consumer");
             true
         } else {
             debug!("Failed to wake consumer");
@@ -93,15 +91,13 @@ where
         }
     }
 
-    fn register_waker(&mut self, waker: &Waker) -> bool {
-        if self
-            .producer_waker
-            .try_lock(|wk| {
-                wk.register(waker);
-                trace!("Registered producer waker");
-            })
-            .is_some()
-        {
+    /// Try to register `waker` as the waker for this [`Producer`]
+    ///
+    /// Returns true if the waker was registered succesfully.
+    fn try_register_waker(&mut self, waker: &Waker) -> bool {
+        let prod_waker = self.producer_waker;
+        if prod_waker.try_lock(|wk| wk.register(waker)).is_some() {
+            trace!("Registered producer waker");
             true
         } else {
             trace!("Failed to register producer waker");
@@ -158,7 +154,7 @@ where
 
         me.value_to_enqueue = Some(failed_enqueue_value);
 
-        if !me.producer.register_waker(cx.waker()) {
+        if !me.producer.try_register_waker(cx.waker()) {
             cx.waker().wake_by_ref();
         }
         Poll::Pending
