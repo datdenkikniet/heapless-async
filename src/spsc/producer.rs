@@ -58,7 +58,7 @@ where
             .producer
             .consumer_waker
             .try_lock(|wk| {
-                debug!("Waking consumer");
+                trace!("Waking consumer");
                 wk.wake();
             })
             .is_some()
@@ -76,13 +76,13 @@ where
             .producer_waker
             .try_lock(|wk| {
                 wk.register(waker);
-                debug!("Registered producer waker")
+                trace!("Registered producer waker");
             })
             .is_some()
         {
             true
         } else {
-            debug!("Failed to register producer waker");
+            trace!("Failed to register producer waker");
             false
         }
     }
@@ -98,7 +98,7 @@ where
         self: core::pin::Pin<&mut Self>,
         cx: &mut core::task::Context<'_>,
     ) -> Poll<Self::Output> {
-        debug!("Poll producer");
+        trace!("Poll producer");
         let try_wake_consumer = |me: &mut Self| {
             if me.try_wake_consumer() {
                 return Poll::Ready(());
