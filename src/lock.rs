@@ -1,13 +1,10 @@
 use core::{
     cell::UnsafeCell,
-    sync::atomic::{AtomicUsize, Ordering},
+    sync::atomic::{AtomicBool, Ordering},
 };
 
-const UNLOCKED: usize = 0;
-const LOCKED: usize = 1;
-
 pub struct Lock<T> {
-    lock: AtomicUsize,
+    locked: AtomicBool,
     value: UnsafeCell<T>,
 }
 
@@ -17,7 +14,7 @@ unsafe impl<T> Sync for Lock<T> {}
 impl<T> Lock<T> {
     pub fn new(value: T) -> Self {
         Self {
-            lock: AtomicUsize::new(UNLOCKED),
+            locked: AtomicBool::new(false),
             value: UnsafeCell::new(value),
         }
     }
@@ -27,15 +24,15 @@ impl<T> Lock<T> {
         F: FnOnce(&mut T) -> R,
     {
         if let Ok(_) =
-            self.lock
-                .compare_exchange(UNLOCKED, LOCKED, Ordering::SeqCst, Ordering::Relaxed)
+            self.locked
+                .compare_exchange(false, true, Ordering::SeqCst, Ordering::Relaxed)
         {
             // SAFETY: we are guaranteed to have locked `self.lock` here,
             // so we have exclusive access to &self
             let value_mut = unsafe { &mut *self.value.get() };
             let res = op(value_mut);
 
-            self.lock.store(UNLOCKED, Ordering::SeqCst);
+            self.locked.store(false, Ordering::SeqCst);
 
             Some(res)
         } else {
