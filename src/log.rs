@@ -1,16 +1,16 @@
 pub use self::log::*;
 
-#[cfg(feature = "defmt")]
+#[cfg(feature = "log-defmt")]
 mod log {
-    pub(crate) use defmt::{debug, error, info, trace, warn};
+    pub use defmt::{debug, error, info, trace, warn};
 }
 
-#[cfg(feature = "log")]
+#[cfg(feature = "log-log")]
 mod log {
-    pub(crate) use log::{debug, error, info, trace, warn};
+    pub use log::{debug, error, info, trace, warn};
 }
 
-#[cfg(not(any(feature = "defmt", feature = "log")))]
+#[cfg(not(any(feature = "log-defmt", feature = "log-log")))]
 mod log {
 
     #[macro_export]
