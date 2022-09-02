@@ -87,8 +87,8 @@ mod test {
             for i in data {
                 tx.enqueue(i).await;
                 interval.tick().await;
+                println!("Succesfully enqueued {}", i);
             }
-            println!("Succesfully enqueued");
         });
 
         let (t1, t2) = tokio::join!(t1, t2);
