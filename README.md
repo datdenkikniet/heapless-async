@@ -1,1 +1,1 @@
-# Async wrappers for `heapless` types
+# Async wrappers for `heapless` queue types
