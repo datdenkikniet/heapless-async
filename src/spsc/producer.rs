@@ -5,7 +5,7 @@ use core::{
 
 use heapless::spsc::Producer as HProducer;
 
-use crate::{lock::Lock, log::*, waker::WakerRegistration};
+use crate::{log::*, mutex::Mutex, waker::WakerRegistration};
 
 /// The error value that can be returned by
 /// the fallible [`Producer::try_enqueue`] method.
@@ -29,8 +29,8 @@ where
     T: Unpin,
 {
     inner: HProducer<'queue, T, N>,
-    producer_waker: &'queue Lock<WakerRegistration>,
-    consumer_waker: &'queue Lock<WakerRegistration>,
+    producer_waker: &'queue Mutex<WakerRegistration>,
+    consumer_waker: &'queue Mutex<WakerRegistration>,
 }
 
 impl<'queue, T, const N: usize> Producer<'queue, T, N>
@@ -39,8 +39,8 @@ where
 {
     pub(crate) fn new(
         producer: HProducer<'queue, T, N>,
-        producer_waker: &'queue Lock<WakerRegistration>,
-        consumer_waker: &'queue Lock<WakerRegistration>,
+        producer_waker: &'queue Mutex<WakerRegistration>,
+        consumer_waker: &'queue Mutex<WakerRegistration>,
     ) -> Self {
         Self {
             inner: producer,
@@ -95,8 +95,8 @@ where
     ///
     /// Returns true if the waker was waked succesfully.
     fn try_wake_consumer(&mut self) -> bool {
-        let cons_waker = &mut self.consumer_waker;
-        if cons_waker.try_lock(|wk| wk.wake()).is_some() {
+        if let Some(mut wk) = self.consumer_waker.try_lock() {
+            wk.wake();
             trace!("Waking consumer");
             true
         } else {
@@ -109,8 +109,8 @@ where
     ///
     /// Returns true if the waker was registered succesfully.
     fn try_register_waker(&mut self, waker: &Waker) -> bool {
-        let prod_waker = self.producer_waker;
-        if prod_waker.try_lock(|wk| wk.register(waker)).is_some() {
+        if let Some(mut wk) = self.producer_waker.try_lock() {
+            wk.register(waker);
             trace!("Registered producer waker");
             true
         } else {

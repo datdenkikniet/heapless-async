@@ -7,20 +7,20 @@ use core::task::Waker;
 
 use heapless::mpmc::MpMcQueue as HMpMcQueue;
 
-use crate::{lock::Lock, waker::WakerRegistration};
+use crate::{mutex::Mutex, waker::WakerRegistration};
 
 use self::{dequeue::DequeueFuture, enqueue::EnqueueFuture};
 
 struct WakerStorage<const W: usize> {
-    dequeue_wakers: Lock<[WakerRegistration; W]>,
-    enqueue_wakers: Lock<[WakerRegistration; W]>,
+    dequeue_wakers: Mutex<[WakerRegistration; W]>,
+    enqueue_wakers: Mutex<[WakerRegistration; W]>,
 }
 
 impl<const W: usize> WakerStorage<W> {
     pub const fn new() -> Self {
         Self {
-            dequeue_wakers: Lock::new([WakerRegistration::EMPTY; W]),
-            enqueue_wakers: Lock::new([WakerRegistration::EMPTY; W]),
+            dequeue_wakers: Mutex::new([WakerRegistration::EMPTY; W]),
+            enqueue_wakers: Mutex::new([WakerRegistration::EMPTY; W]),
         }
     }
 }
@@ -73,13 +73,14 @@ where
     pub(crate) fn try_wake_enqueuers(&self) -> bool {
         self.wakers
             .enqueue_wakers
-            .try_lock(|wks| wks.iter_mut().for_each(|wk| wk.wake()))
+            .try_lock()
+            .map(|mut wks| wks.iter_mut().for_each(|wk| wk.wake()))
             .is_some()
     }
 
     /// Attempt to register `waker` as a dequeuer waker
     pub(crate) fn register_dequeuer_waker(&self, waker: &Waker) -> bool {
-        let res = self.wakers.dequeue_wakers.try_lock(|wks| {
+        let res = self.wakers.dequeue_wakers.try_lock().map(|mut wks| {
             wks.iter_mut()
                 .find(|wk| wk.is_empty())
                 .map(|wk| wk.register(waker))
@@ -96,13 +97,14 @@ where
     pub(crate) fn try_wake_dequeuers(&self) -> bool {
         self.wakers
             .dequeue_wakers
-            .try_lock(|wks| wks.iter_mut().for_each(|wk| wk.wake()))
+            .try_lock()
+            .map(|mut wks| wks.iter_mut().for_each(|wk| wk.wake()))
             .is_some()
     }
 
     /// Attempt to register `waker` as an enqueuer waker
     pub(crate) fn register_enqueuer_waker(&self, waker: &Waker) -> bool {
-        let res = self.wakers.enqueue_wakers.try_lock(|wks| {
+        let res = self.wakers.enqueue_wakers.try_lock().map(|mut wks| {
             wks.iter_mut()
                 .find(|wk| wk.is_empty())
                 .map(|wk| wk.register(waker))

@@ -2,7 +2,7 @@
 #![no_std]
 #![deny(missing_docs)]
 
-mod lock;
+mod mutex;
 mod waker;
 
 pub(crate) mod log;

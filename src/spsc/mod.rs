@@ -8,7 +8,7 @@ pub use producer::Producer;
 mod consumer;
 pub use consumer::Consumer;
 
-use crate::{lock::Lock, waker::WakerRegistration};
+use crate::{mutex::Mutex, waker::WakerRegistration};
 
 /// An async queue
 pub struct Queue<T, const N: usize>
@@ -16,8 +16,8 @@ where
     T: Unpin,
 {
     inner: HQueue<T, N>,
-    producer_waker: Lock<WakerRegistration>,
-    consumer_waker: Lock<WakerRegistration>,
+    producer_waker: Mutex<WakerRegistration>,
+    consumer_waker: Mutex<WakerRegistration>,
 }
 
 impl<T, const N: usize> Queue<T, N>
@@ -28,8 +28,8 @@ where
     pub const fn new() -> Self {
         Self {
             inner: HQueue::new(),
-            producer_waker: Lock::new(WakerRegistration::new()),
-            consumer_waker: Lock::new(WakerRegistration::new()),
+            producer_waker: Mutex::new(WakerRegistration::new()),
+            consumer_waker: Mutex::new(WakerRegistration::new()),
         }
     }
 
