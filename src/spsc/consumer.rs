@@ -8,8 +8,8 @@ use heapless::spsc::Consumer as HConsumer;
 use crate::{log::*, mutex::Mutex, waker::WakerRegistration};
 
 /// This error may be returned by [`Consumer::try_dequeue`].
-pub enum ConsumerError {
-    WouldBlock,
+pub enum ConsumerError<T> {
+    WouldBlock(Option<T>),
     Empty,
 }
 
@@ -70,23 +70,27 @@ where
     /// Attempt to dequeue an item from the backing queue.
     ///
     /// If [`ConsumerError::WouldBlock`] is returned, the [`Producer`](super::Producer)
-    /// has a lock on it's waker which prevents this consumer from properly waking it.
-    pub fn try_dequeue(&mut self) -> Result<T, ConsumerError> {
-        if !self.try_wake_producer() {
-            return Err(ConsumerError::WouldBlock);
-        }
-
-        if let Some(val) = self.inner.dequeue() {
+    /// has a lock on it's waker which prevents this producer from properly waking it.
+    /// In such a case, the application can attempt to re-wake the [`Producer`](super::Producer)
+    /// by calling [`Consumer::try_wake_producer`].
+    pub fn try_dequeue(&mut self) -> Result<T, ConsumerError<T>> {
+        let res = if let Some(val) = self.inner.dequeue() {
             Ok(val)
         } else {
             Err(ConsumerError::Empty)
+        };
+
+        if !self.try_wake_producer() {
+            return Err(ConsumerError::WouldBlock(res.ok()));
         }
+
+        res
     }
 
     /// Try to wake the [`Producer`](super::Producer) associated with the backing queue.
     ///
     /// Returns true if the waker was waked succesfully.
-    fn try_wake_producer(&mut self) -> bool {
+    pub fn try_wake_producer(&mut self) -> bool {
         if let Some(mut wk) = self.producer_waker.try_lock() {
             wk.wake();
             trace!("Waking producer");

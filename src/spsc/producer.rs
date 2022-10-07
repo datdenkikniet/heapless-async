@@ -10,17 +10,8 @@ use crate::{log::*, mutex::Mutex, waker::WakerRegistration};
 /// The error value that can be returned by
 /// the fallible [`Producer::try_enqueue`] method.
 pub enum ProducerError<T> {
-    WouldBlock(T),
+    WouldBlock,
     Full(T),
-}
-
-impl<T> ProducerError<T> {
-    pub fn get_value(self) -> T {
-        match self {
-            ProducerError::WouldBlock(v) => v,
-            ProducerError::Full(v) => v,
-        }
-    }
 }
 
 /// An async producer
@@ -83,18 +74,22 @@ where
     ///
     /// If [`ProducerError::WouldBlock`] is returned, the [`Consumer`](super::Consumer)
     /// has a lock on it's waker which prevents this producer from properly waking it.
+    /// In such a case, the application can attempt to re-wake the [`Consumer`](super::Consumer)
+    /// by calling [`Producer::try_wake_consumer`].
     pub fn try_enqueue(&mut self, value: T) -> Result<(), ProducerError<T>> {
+        let res = self.inner.enqueue(value).map_err(ProducerError::Full);
+
         if !self.try_wake_consumer() {
-            return Err(ProducerError::WouldBlock(value));
+            return Err(ProducerError::WouldBlock);
         }
 
-        self.inner.enqueue(value).map_err(ProducerError::Full)
+        res
     }
 
     /// Try to wake the [`Consumer`](super::Consumer) associated with the backing queue.
     ///
     /// Returns true if the waker was waked succesfully.
-    fn try_wake_consumer(&mut self) -> bool {
+    pub fn try_wake_consumer(&mut self) -> bool {
         if let Some(mut wk) = self.consumer_waker.try_lock() {
             wk.wake();
             trace!("Waking consumer");
