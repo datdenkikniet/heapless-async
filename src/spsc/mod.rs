@@ -3,10 +3,10 @@
 use heapless::spsc::Queue as HQueue;
 
 mod producer;
-pub use producer::Producer;
+pub use producer::{Producer, ProducerError};
 
 mod consumer;
-pub use consumer::Consumer;
+pub use consumer::{Consumer, ConsumerError};
 
 use crate::{mutex::Mutex, waker::WakerRegistration};
 

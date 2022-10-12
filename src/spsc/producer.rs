@@ -10,7 +10,22 @@ use crate::{log::*, mutex::Mutex, waker::WakerRegistration};
 /// The error value that can be returned by
 /// the fallible [`Producer::try_enqueue`] method.
 pub enum ProducerError<T> {
+    /// Waking the consumer would block.
+    ///
+    /// Retrying is possible, but is highly discouraged
+    /// as it may block forever.
+    ///
+    /// It only works if releasing the lock held by the
+    /// consumer preempts the code that performs the retries.
     WouldBlock,
+    /// Attempting to enqueue a value failed because the queue
+    /// is full.
+    ///
+    /// Retrying is possible, but is highly discouraged as it
+    /// may block forever.
+    ///
+    /// It only works if dequeueing an item from the backing
+    /// queue preempts the code that performs the retries.
     Full(T),
 }
 

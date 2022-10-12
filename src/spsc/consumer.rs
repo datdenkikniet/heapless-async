@@ -9,7 +9,21 @@ use crate::{log::*, mutex::Mutex, waker::WakerRegistration};
 
 /// This error may be returned by [`Consumer::try_dequeue`].
 pub enum ConsumerError<T> {
+    /// Waking the producer would block.
+    ///
+    /// Retrying is possible, but is highly discouraged as it
+    /// may block forever.
+    ///
+    /// It only works if releasing the lock held by the producer
+    /// preempts the code that performs the retries.    
     WouldBlock(Option<T>),
+    /// The queue is empty.
+    ///
+    /// Retrying is possible, but is highly discouraged as it
+    /// may block forever.
+    ///
+    /// It only works if enqueueing an item into the backing
+    /// queue preempts the code that performs the retries.
     Empty,
 }
 
